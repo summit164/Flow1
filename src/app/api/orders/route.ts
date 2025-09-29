@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 
 // Function to log data to Google Sheets
-async function logToGoogleSheets(orderData: any) {
+async function logToGoogleSheets(orderData: OrderData) {
   try {
     const url = `${process.env.NEXTJS_URL || 'http://localhost:3000'}/api/sheets`;
     console.log('Calling Google Sheets API at:', url);
@@ -132,7 +132,7 @@ export async function GET(request: NextRequest) {
     
     if (userId) {
       // Return orders for specific user
-      const userOrders = allOrders.filter((order: any) => order.userId === userId);
+      const userOrders = allOrders.filter((order: OrderData) => order.userId === userId);
       return NextResponse.json({ orders: userOrders });
     }
     

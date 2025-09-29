@@ -170,7 +170,14 @@ export const Component = () => {
     setTimeout(() => setIsCartAnimating(false), 600);
   };
 
-  const handleAddReadyBouquetToCart = (bouquet: any) => {
+  const handleAddReadyBouquetToCart = (bouquet: {
+    id: string;
+    name: string;
+    price: number;
+    emoji: string;
+    description: string;
+    flowers: string[];
+  }) => {
     const cartItem: CartItem = {
       id: `ready-${bouquet.id}-${Date.now()}-${Math.random()}`,
       flower: {
