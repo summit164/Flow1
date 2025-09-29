@@ -1,0 +1,34 @@
+{
+  "orderId": "order_1758797557122_47qirqt4n",
+  "userId": "test_user_123",
+  "phoneNumber": "+7 999 123 45 67",
+  "address": "Москва, ул. Тестовая, д. 1, кв. 1",
+  "items": [
+    {
+      "id": "test-item-1",
+      "flower": {
+        "id": "rose",
+        "name": "Красная роза",
+        "price": 150,
+        "emoji": "🌹",
+        "description": "Красивая красная роза"
+      },
+      "quantity": 3
+    },
+    {
+      "id": "test-item-2",
+      "flower": {
+        "id": "tulip",
+        "name": "Желтый тюльпан",
+        "price": 100,
+        "emoji": "🌷",
+        "description": "Яркий желтый тюльпан"
+      },
+      "quantity": 2
+    }
+  ],
+  "total": 650,
+  "timestamp": "2025-09-25T10:52:36.042Z",
+  "status": "pending",
+  "createdAt": "2025-09-25T10:52:37.122Z"
+}
