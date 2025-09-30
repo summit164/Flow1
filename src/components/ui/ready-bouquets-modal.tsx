@@ -90,7 +90,7 @@ export function ReadyBouquetsModal({ isOpen, onClose, onAddToCart }: ReadyBouque
             <h2 className="text-2xl font-bold text-gray-900">🌺 Готовые букеты</h2>
             <button
               onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 text-2xl font-bold"
+              className="text-gray-400 hover:text-gray-600 text-2xl font-bold transition-colors duration-200 hover:bg-gray-100 rounded-full w-8 h-8 flex items-center justify-center"
             >
               ×
             </button>

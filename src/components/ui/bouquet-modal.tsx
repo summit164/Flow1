@@ -75,7 +75,7 @@ export function BouquetModal({ isOpen, onClose, onAddToCart }: BouquetModalProps
             <h2 className="text-2xl font-bold text-gray-900">Собрать букет</h2>
             <button
               onClick={onClose}
-              className="text-gray-500 hover:text-gray-700 text-2xl"
+              className="text-gray-400 hover:text-gray-600 text-2xl font-bold transition-colors duration-200 hover:bg-gray-100 rounded-full w-8 h-8 flex items-center justify-center"
             >
               ×
             </button>

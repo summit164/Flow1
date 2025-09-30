@@ -104,17 +104,21 @@ export const Component = () => {
     setCart([]);
   };
 
-  const handleCheckout = async (phoneNumber?: string, address?: string) => {
+  const handleCheckout = async (phoneNumber?: string, address?: string, telegramId?: string) => {
     if (cart.length === 0) {
       showToast("Корзина пуста!");
       return;
     }
 
     try {
-      // Generate unique user ID based on phone number
+      // Generate unique user ID based on priority: telegramId > phoneNumber > stored > random
       let userId = localStorage.getItem('flowerShopUserId');
       
-      if (phoneNumber) {
+      if (telegramId) {
+        // If Telegram ID is provided, use it as the primary user ID
+        userId = `telegram_${telegramId}`;
+        localStorage.setItem('flowerShopUserId', userId);
+      } else if (phoneNumber) {
         // If phone number is provided, use it as the user ID
         userId = `phone_${phoneNumber.replace(/\D/g, '')}`;
         localStorage.setItem('flowerShopUserId', userId);
@@ -128,6 +132,7 @@ export const Component = () => {
         userId: userId,
         phoneNumber: phoneNumber,
         address: address,
+        telegramId: telegramId,
         items: cart,
         total: getCartTotal(),
         timestamp: new Date().toISOString(),
@@ -144,7 +149,9 @@ export const Component = () => {
       });
 
       if (response.ok) {
-        if (phoneNumber) {
+        if (telegramId) {
+          showToast(`Заказ оформлен! Заказ привязан к Telegram ID ${telegramId}. Проверьте заказ в боте через кнопку "🛒 Моя корзина".`);
+        } else if (phoneNumber) {
           showToast(`Заказ оформлен! Мы свяжемся с вами по номеру ${phoneNumber}. Также вы можете просмотреть заказ в Telegram боте.`);
         } else {
           showToast(`Заказ оформлен! ID пользователя: ${userId.slice(-6)}. Свяжитесь с нами в Telegram для подтверждения.`);

@@ -44,7 +44,7 @@ export function ContactsModal({ isOpen, onClose }: ContactsModalProps) {
             </div>
             <button
               onClick={onClose}
-              className="text-white hover:text-blue-200 text-2xl transition-colors"
+              className="text-white hover:text-blue-200 text-2xl font-bold transition-colors duration-200 hover:bg-white/20 rounded-full w-8 h-8 flex items-center justify-center"
             >
               ×
             </button>

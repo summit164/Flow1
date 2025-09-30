@@ -45,6 +45,9 @@ interface CartItem {
 
 interface OrderData {
   userId: string;
+  phoneNumber?: string;
+  address?: string;
+  telegramId?: string;
   items: CartItem[];
   total: number;
   timestamp: string;

@@ -23,12 +23,13 @@ interface CartModalProps {
   onClose: () => void;
   cartItems: CartItem[];
   onClearCart: () => void;
-  onCheckout: (phoneNumber?: string, address?: string) => void;
+  onCheckout: (phoneNumber?: string, address?: string, telegramId?: string) => void;
 }
 
 export function CartModal({ isOpen, onClose, cartItems, onClearCart, onCheckout }: CartModalProps) {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [address, setAddress] = useState('');
+  const [telegramId, setTelegramId] = useState('');
   
   if (!isOpen) return null;
 
@@ -49,6 +50,7 @@ export function CartModal({ isOpen, onClose, cartItems, onClearCart, onCheckout 
   const handleCheckout = () => {
     const trimmedPhone = phoneNumber.trim();
     const trimmedAddress = address.trim();
+    const trimmedTelegramId = telegramId.trim();
     
     if (!trimmedPhone) {
       alert('Пожалуйста, укажите номер телефона');
@@ -60,7 +62,7 @@ export function CartModal({ isOpen, onClose, cartItems, onClearCart, onCheckout 
       return;
     }
     
-    onCheckout(trimmedPhone, trimmedAddress);
+    onCheckout(trimmedPhone, trimmedAddress, trimmedTelegramId);
   };
 
   return (
@@ -78,7 +80,7 @@ export function CartModal({ isOpen, onClose, cartItems, onClearCart, onCheckout 
             <h2 className="text-2xl font-bold text-gray-900">🛒 Корзина</h2>
             <button
               onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 text-2xl font-bold"
+              className="text-gray-400 hover:text-gray-600 text-2xl font-bold transition-colors duration-200 hover:bg-gray-100 rounded-full w-8 h-8 flex items-center justify-center"
             >
               ×
             </button>
@@ -152,7 +154,25 @@ export function CartModal({ isOpen, onClose, cartItems, onClearCart, onCheckout 
                 required
               />
               <p className="text-xs text-gray-500 mt-1">
-                📱 По этому номеру мы свяжемся с вами и привяжем заказ к Telegram боту
+                📱 По этому номеру мы свяжемся с вами
+              </p>
+            </div>
+
+            {/* Поле для Telegram ID */}
+            <div className="mb-4">
+              <label htmlFor="telegramId" className="block text-sm font-medium text-gray-700 mb-2">
+                Telegram ID (необязательно)
+              </label>
+              <input
+                type="text"
+                id="telegramId"
+                value={telegramId}
+                onChange={(e) => setTelegramId(e.target.value)}
+                placeholder="Например: 123456789"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                🤖 Укажите ваш Telegram ID для просмотра заказа в боте. Получить ID: /myid в боте
               </p>
             </div>
 
