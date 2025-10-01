@@ -51,8 +51,8 @@
 
 ### 1. Клонирование репозитория
 ```bash
-git clone https://github.com/YOUR_USERNAME/flower-shop.git
-cd flower-shop
+git clone https://github.com/summit164/Flow1.git
+cd Flow1
 ```
 
 ### 2. Настройка Backend
