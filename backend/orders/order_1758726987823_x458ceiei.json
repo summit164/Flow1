@@ -1,0 +1,21 @@
+{
+  "orderId": "order_1758726987823_x458ceiei",
+  "userId": "user_@RyazanovKirill",
+  "items": [
+    {
+      "id": "ready-romantic-red-1758726936875-0.8677957489953504",
+      "flower": {
+        "id": "romantic-red",
+        "name": "Романтический красный",
+        "price": 2500,
+        "emoji": "🌹",
+        "description": "Классический букет из красных роз для особых моментов"
+      },
+      "quantity": 1
+    }
+  ],
+  "total": 2500,
+  "timestamp": "2025-09-24T15:16:26.736Z",
+  "status": "pending",
+  "createdAt": "2025-09-24T15:16:27.823Z"
+}

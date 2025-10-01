@@ -1,0 +1,21 @@
+{
+  "id": "order_1759319270765",
+  "timestamp": "2025-10-01T11:47:50.765Z",
+  "userId": "user789",
+  "phone": "+7-999-777-5544",
+  "items": [
+    {
+      "name": "????? ???????",
+      "quantity": 1,
+      "price": 300
+    },
+    {
+      "name": "????????",
+      "quantity": 1,
+      "price": 120
+    }
+  ],
+  "total": 420,
+  "address": "??. ???????, 42",
+  "status": "pending"
+}

@@ -1,0 +1,44 @@
+{
+  "name": "flower-shop-backend",
+  "version": "1.0.0",
+  "description": "Backend services for flower shop including API routes, Telegram bot, and server configuration",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node api/server.js",
+    "dev": "nodemon api/server.js",
+    "bot": "node telegram_bot/bot.js",
+    "bot:dev": "nodemon telegram_bot/bot.js",
+    "https": "node config/https-server.js",
+    "cert": "node config/generate-cert.js",
+    "install:bot": "cd telegram_bot && npm install",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "axios": "^1.12.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.0.3",
+    "express": "^4.18.2",
+    "googleapis": "^128.0.0",
+    "https": "^1.0.0",
+    "node-telegram-bot-api": "^0.61.0",
+    "fs": "^0.0.1-security",
+    "path": "^0.12.7"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.22"
+  },
+  "keywords": [
+    "flower-shop",
+    "backend",
+    "api",
+    "telegram-bot",
+    "express",
+    "google-sheets"
+  ],
+  "author": "Flower Shop Team",
+  "license": "MIT",
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}

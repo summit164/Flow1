@@ -1,0 +1,21 @@
+{
+  "id": "order_1759319546362",
+  "timestamp": "2025-10-01T11:52:26.362Z",
+  "userId": "user222",
+  "phone": "+7-666-444-2211",
+  "items": [
+    {
+      "name": "????? ?????",
+      "quantity": 2,
+      "price": 320
+    },
+    {
+      "name": "??????????",
+      "quantity": 1,
+      "price": 90
+    }
+  ],
+  "total": 730,
+  "address": "??. ??????, 25",
+  "status": "pending"
+}
