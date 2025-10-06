@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
     const orderData: OrderData = await request.json();
     
     // Create orders directory if it doesn't exist
-    const ordersDir = path.join(process.cwd(), 'orders');
+    const ordersDir = process.env.NODE_ENV === 'production' ? path.join('/tmp', 'orders') : path.join(process.cwd(), 'orders');
     if (!fs.existsSync(ordersDir)) {
       fs.mkdirSync(ordersDir, { recursive: true });
     }
@@ -138,7 +138,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId');
     
-    const ordersDir = path.join(process.cwd(), 'orders');
+    const ordersDir = process.env.NODE_ENV === 'production' ? path.join('/tmp', 'orders') : path.join(process.cwd(), 'orders');
     const masterOrdersPath = path.join(ordersDir, 'all_orders.json');
     
     if (!fs.existsSync(masterOrdersPath)) {
@@ -164,3 +164,4 @@ export async function GET(request: NextRequest) {
     );
   }
 }
+
