@@ -16,8 +16,23 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 // Middleware
+const allowedOrigins = [
+  'http://localhost:3000',
+  'https://localhost:3000',
+  'http://192.168.1.6:3000',
+  process.env.NEXTJS_URL
+].filter(Boolean);
+
 app.use(cors({
-  origin: ['http://localhost:3000', 'https://localhost:3000'],
+  origin: (origin, callback) => {
+    // Allow non-browser requests (no origin) and whitelisted origins
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      console.warn(`CORS blocked origin: ${origin}`);
+      callback(null, false);
+    }
+  },
   credentials: true
 }));
 app.use(express.json());
@@ -39,12 +54,21 @@ app.get('/', (req, res) => {
 // Orders API
 app.get('/api/orders', (req, res) => {
   try {
+    const { userId } = req.query;
     const ordersPath = path.join(__dirname, '../orders/all_orders.json');
+    
     if (fs.existsSync(ordersPath)) {
-      const orders = JSON.parse(fs.readFileSync(ordersPath, 'utf8'));
-      res.json(orders);
+      let orders = JSON.parse(fs.readFileSync(ordersPath, 'utf8'));
+      
+      // Фильтрация по userId, если параметр передан
+      if (userId) {
+        orders = orders.filter(order => order.userId === userId);
+        console.log(`🔍 Фильтрация заказов для пользователя ${userId}: найдено ${orders.length} заказов`);
+      }
+      
+      res.json({ orders, count: orders.length });
     } else {
-      res.json([]);
+      res.json({ orders: [], count: 0 });
     }
   } catch (error) {
     console.error('Error reading orders:', error);
@@ -52,9 +76,10 @@ app.get('/api/orders', (req, res) => {
   }
 });
 
-app.post('/api/orders', (req, res) => {
+app.post('/api/orders', async (req, res) => {
   try {
     const newOrder = req.body;
+    console.log('📥 Received order data:', JSON.stringify(newOrder, null, 2));
     const timestamp = new Date().toISOString();
     const orderId = `order_${Date.now()}`;
     
@@ -64,71 +89,46 @@ app.post('/api/orders', (req, res) => {
       ...newOrder
     };
 
-    // Save individual order file
-    const orderPath = path.join(__dirname, `../orders/${orderId}.json`);
-    fs.writeFileSync(orderPath, JSON.stringify(orderWithMeta, null, 2));
+    // Choose safe orders directory (/tmp in production)
+    const isProd = process.env.NODE_ENV === 'production' || process.env.VERCEL;
+    const ordersDir = isProd ? path.join('/tmp', 'orders') : path.join(__dirname, '../orders');
 
-    // Update all orders file
-    const allOrdersPath = path.join(__dirname, '../orders/all_orders.json');
-    let allOrders = [];
-    
-    if (fs.existsSync(allOrdersPath)) {
-      allOrders = JSON.parse(fs.readFileSync(allOrdersPath, 'utf8'));
-    }
-    
-    allOrders.push(orderWithMeta);
-    fs.writeFileSync(allOrdersPath, JSON.stringify(allOrders, null, 2));
-
-    // Log to Google Sheets (asynchronously, don't block response)
-    const logToGoogleSheets = async (orderData) => {
-      try {
-        const postData = JSON.stringify({ orderData });
-        
-        const options = {
-          hostname: 'localhost',
-          port: 3001,
-          path: '/api/sheets',
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Content-Length': Buffer.byteLength(postData)
-          }
-        };
-
-        const req = http.request(options, (res) => {
-          let data = '';
-          
-          res.on('data', (chunk) => {
-            data += chunk;
-          });
-          
-          res.on('end', () => {
-            try {
-              const result = JSON.parse(data);
-              if (res.statusCode >= 200 && res.statusCode < 300) {
-                console.log(`Order ${orderData.id} logged to Google Sheets successfully`);
-              } else {
-                console.error(`Google Sheets API error: ${res.statusCode} - ${data}`);
-              }
-            } catch (parseError) {
-              console.error('Failed to parse Google Sheets response:', parseError);
-            }
-          });
-        });
-
-        req.on('error', (error) => {
-          console.error('Failed to log to Google Sheets:', error);
-        });
-
-        req.write(postData);
-        req.end();
-      } catch (error) {
-        console.error('Failed to log to Google Sheets:', error);
+    // Best-effort local logging; never block response
+    try {
+      if (!fs.existsSync(ordersDir)) {
+        fs.mkdirSync(ordersDir, { recursive: true });
       }
-    };
 
-    // Call Google Sheets logging asynchronously
-    logToGoogleSheets(orderWithMeta).catch(console.error);
+      const orderPath = path.join(ordersDir, `${orderId}.json`);
+      fs.writeFileSync(orderPath, JSON.stringify(orderWithMeta, null, 2), 'utf8');
+
+      const allOrdersPath = path.join(ordersDir, 'all_orders.json');
+      let allOrders = [];
+      if (fs.existsSync(allOrdersPath)) {
+        try {
+          allOrders = JSON.parse(fs.readFileSync(allOrdersPath, 'utf8'));
+        } catch (e) {
+          console.warn('Failed to parse all_orders.json, resetting:', e);
+          allOrders = [];
+        }
+      }
+      allOrders.push(orderWithMeta);
+      fs.writeFileSync(allOrdersPath, JSON.stringify(allOrders, null, 2), 'utf8');
+    } catch (fsErr) {
+      console.error('Skipping local file log due to error:', fsErr);
+    }
+
+    // Log to Google Sheets directly via handler (no network)
+    try {
+      const { default: sheetsHandler } = await import('./sheets.js');
+      await sheetsHandler(
+        { method: 'POST', body: { orderData: orderWithMeta } },
+        { status(code) { this.statusCode = code; return this; }, json(payload) { this.payload = payload; } }
+      );
+      console.log(`Order ${orderId} logged to Google Sheets via handler`);
+    } catch (sheetsErr) {
+      console.error('Sheets logging failed (non-blocking):', sheetsErr);
+    }
 
     res.status(201).json({ 
       success: true, 
@@ -137,7 +137,7 @@ app.post('/api/orders', (req, res) => {
     });
   } catch (error) {
     console.error('Error creating order:', error);
-    res.status(500).json({ error: 'Failed to create order' });
+    res.status(500).json({ error: 'Failed to create order', detail: error?.message });
   }
 });
 
