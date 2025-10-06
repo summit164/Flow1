@@ -17,7 +17,6 @@ function resolveBaseUrl(req: NextRequest): string {
 // Function to log data to Google Sheets
 async function logToGoogleSheets(req: NextRequest, orderData: OrderData) {
   try {
-    // Log to Google Sheets via Next.js API route (works on Vercel)
     const base = resolveBaseUrl(req);
     const url = `${base}/api/sheets`;
     console.log('Calling Google Sheets API at:', url);
@@ -40,7 +39,6 @@ async function logToGoogleSheets(req: NextRequest, orderData: OrderData) {
     }
   } catch (error) {
     console.error('Failed to log to Google Sheets:', error);
-    // Don't interrupt execution if logging fails
     throw error;
   }
 }
@@ -71,40 +69,48 @@ interface OrderData {
 export async function POST(request: NextRequest) {
   try {
     const orderData: OrderData = await request.json();
-    
-    // Create orders directory if it doesn't exist
-    const ordersDir = process.env.NODE_ENV === 'production' ? path.join('/tmp', 'orders') : path.join(process.cwd(), 'orders');
-    if (!fs.existsSync(ordersDir)) {
-      fs.mkdirSync(ordersDir, { recursive: true });
-    }
-    
-    // Save order to file
+
+    // Generate orderId and prepare orderWithId
     const orderId = `order_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    const orderFilePath = path.join(ordersDir, `${orderId}.json`);
-    
     const orderWithId = {
       orderId,
       ...orderData,
       createdAt: new Date().toISOString()
     };
-    
-    fs.writeFileSync(orderFilePath, JSON.stringify(orderWithId, null, 2));
-    
-    // Also append to a master orders file for easy access
-    const masterOrdersPath = path.join(ordersDir, 'all_orders.json');
-    let allOrders = [];
-    
-    if (fs.existsSync(masterOrdersPath)) {
-      const existingData = fs.readFileSync(masterOrdersPath, 'utf8');
-      allOrders = JSON.parse(existingData);
+
+    // Try local file logging, but never fail if it errors (Vercel /tmp only)
+    try {
+      const ordersDir = process.env.NODE_ENV === 'production'
+        ? path.join('/tmp', 'orders')
+        : path.join(process.cwd(), 'orders');
+
+      if (!fs.existsSync(ordersDir)) {
+        fs.mkdirSync(ordersDir, { recursive: true });
+      }
+
+      const orderFilePath = path.join(ordersDir, `${orderId}.json`);
+      fs.writeFileSync(orderFilePath, JSON.stringify(orderWithId, null, 2));
+
+      const masterOrdersPath = path.join(ordersDir, 'all_orders.json');
+      let allOrders: any[] = [];
+      if (fs.existsSync(masterOrdersPath)) {
+        const existingData = fs.readFileSync(masterOrdersPath, 'utf8');
+        try {
+          allOrders = JSON.parse(existingData);
+        } catch (e) {
+          console.warn('Failed to parse existing all_orders.json, resetting:', e);
+          allOrders = [];
+        }
+      }
+      allOrders.push(orderWithId);
+      fs.writeFileSync(masterOrdersPath, JSON.stringify(allOrders, null, 2));
+
+      console.log(`New order saved locally: ${orderId} for user ${orderData.userId}`);
+    } catch (fsErr) {
+      console.error('Filesystem write skipped due to error/environment:', fsErr);
     }
-    
-    allOrders.push(orderWithId);
-    fs.writeFileSync(masterOrdersPath, JSON.stringify(allOrders, null, 2));
-    
-    console.log(`New order saved: ${orderId} for user ${orderData.userId}`);
-    
-    // Log to Google Sheets (asynchronously, don't block response)
+
+    // Log to Google Sheets (do not fail request on errors)
     try {
       const sheetsData = {
         ...orderData,
@@ -115,7 +121,6 @@ export async function POST(request: NextRequest) {
       console.log('Successfully logged to Google Sheets');
     } catch (error) {
       console.error('Failed to log to Google Sheets:', error);
-      // Don't fail the order if Google Sheets logging fails
     }
     
     return NextResponse.json({ 
@@ -148,12 +153,10 @@ export async function GET(request: NextRequest) {
     const allOrders = JSON.parse(fs.readFileSync(masterOrdersPath, 'utf8'));
     
     if (userId) {
-      // Return orders for specific user
       const userOrders = allOrders.filter((order: OrderData) => order.userId === userId);
       return NextResponse.json({ orders: userOrders });
     }
     
-    // Return all orders
     return NextResponse.json({ orders: allOrders });
     
   } catch (error) {
@@ -164,4 +167,3 @@ export async function GET(request: NextRequest) {
     );
   }
 }
-
