@@ -1,11 +1,25 @@
-import { NextRequest, NextResponse } from 'next/server';
+﻿import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
 
+// Resolve base URL for calling local API routes in any environment
+function resolveBaseUrl(req: NextRequest): string {
+  const explicit = process.env.NEXT_PUBLIC_API_URL || process.env.API_URL;
+  if (explicit) return explicit.replace(/\/$/, '');
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`;
+  }
+  const proto = req.headers.get('x-forwarded-proto') || 'http';
+  const host = req.headers.get('host') || 'localhost:3000';
+  return `${proto}://${host}`;
+}
+
 // Function to log data to Google Sheets
-async function logToGoogleSheets(orderData: OrderData) {
+async function logToGoogleSheets(req: NextRequest, orderData: OrderData) {
   try {
-    const url = `${process.env.NEXTJS_URL || 'http://localhost:3000'}/api/sheets`;
+    // Log to Google Sheets via Next.js API route (works on Vercel)
+    const base = resolveBaseUrl(req);
+    const url = `${base}/api/sheets`;
     console.log('Calling Google Sheets API at:', url);
     console.log('Payload:', JSON.stringify({ orderData }, null, 2));
     
@@ -97,7 +111,7 @@ export async function POST(request: NextRequest) {
         timestamp: new Date().toISOString(),
       };
       console.log('Sending data to Google Sheets:', JSON.stringify(sheetsData, null, 2));
-      await logToGoogleSheets(sheetsData);
+      await logToGoogleSheets(request, sheetsData);
       console.log('Successfully logged to Google Sheets');
     } catch (error) {
       console.error('Failed to log to Google Sheets:', error);
