@@ -131,7 +131,10 @@ export async function POST(request: NextRequest) {
     
   } catch (error) {
     console.error('Error saving order:', error);
-    return NextResponse.json(\n      { success: false, message: 'Failed to save order', error: (error as any)?.message || 'unknown' },\n      { status: 500 }\n    );
+        return NextResponse.json(
+      { success: false, message: 'Failed to save order', error: (error as any)?.message || 'unknown' },
+      { status: 500 }
+    );
   }
 }
 
@@ -164,4 +167,5 @@ export async function GET(request: NextRequest) {
     );
   }
 }
+
 
