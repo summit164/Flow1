@@ -1,5 +1,5 @@
 ﻿import { NextRequest, NextResponse } from 'next/server';
-import { logOrderToSheets } from '../../lib/sheetsLogger';
+import { logOrderToSheets } from '../../../lib/sheetsLogger';
 import fs from 'fs';
 import path from 'path';
 
