@@ -1,0 +1,22 @@
+{
+  "id": "order_1759385274537",
+  "timestamp": "2025-01-01T21:30:00.000Z",
+  "userId": "fixed_test_user",
+  "phoneNumber": "+79111111111",
+  "address": "Москва, ул. Тверская, д. 10",
+  "items": [
+    {
+      "id": "test_rose",
+      "flower": {
+        "id": "rose",
+        "name": "Красная роза",
+        "price": 250,
+        "emoji": "🌹",
+        "description": "Красивая красная роза"
+      },
+      "quantity": 3
+    }
+  ],
+  "total": 750,
+  "status": "pending"
+}

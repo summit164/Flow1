@@ -7,12 +7,23 @@ let SHEET_NAME = 'Orders'; // Название листа в таблице (п�
 
 
 // Настройка аутентификации
+// Подготовим ключ: поддерживаем GOOGLE_PRIVATE_KEY и GOOGLE_PRIVATE_KEY_B64
+const rawKey = process.env.GOOGLE_PRIVATE_KEY_B64
+  ? Buffer.from(process.env.GOOGLE_PRIVATE_KEY_B64, 'base64').toString('utf8')
+  : (process.env.GOOGLE_PRIVATE_KEY || '');
+
+const normalizedPrivateKey = rawKey
+  .replace(/\\n/g, '\n')    // однострочный JSON -> реальные переводы строк
+  .replace(/\r/g, '')         // убрать CR
+  .replace(/^['"]|['"]$/g, '') // убрать случайные кавычки вокруг
+  .trim();
+
 const auth = new google.auth.GoogleAuth({
   credentials: {
     type: 'service_account',
     project_id: process.env.GOOGLE_PROJECT_ID,
     private_key_id: process.env.GOOGLE_PRIVATE_KEY_ID,
-    private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+    private_key: normalizedPrivateKey,
     client_email: process.env.GOOGLE_CLIENT_EMAIL,
     client_id: process.env.GOOGLE_CLIENT_ID,
     auth_uri: 'https://accounts.google.com/o/oauth2/auth',
@@ -74,24 +85,27 @@ export default async function handler(req, res) {
     });
 
     const items = orderData.items.map(item => 
-      `${item.name} x${item.quantity} (${item.price}₽)`
+      `${item.flower.name} x${item.quantity} (${item.flower.price}₽)`
     ).join('; ');
 
+    // Убеждаемся, что все строки правильно кодированы в UTF-8
     const rowData = [
       timestamp,                    // Время заказа
-      orderData.userId,            // ID пользователя
-      orderData.phoneNumber || '', // Номер телефона
-      items,                       // Товары
-      `${orderData.total}₽`,       // Общая сумма
-      orderData.address || '',     // Адрес доставки
-      orderData.status || 'новый'  // Статус заказа
+      String(orderData.userId || ''),            // ID пользователя
+      String(orderData.phoneNumber || ''), // Номер телефона
+      String(items || ''),                       // Товары
+      `${orderData.total || 0}₽`,       // Общая сумма
+      String(orderData.address || ''),     // Адрес доставки
+      String(orderData.status || 'новый')  // Статус заказа
     ];
+
+    console.log('Sending row data to Google Sheets:', rowData);
 
     // Записываем данные в таблицу
     await sheets.spreadsheets.values.append({
       spreadsheetId: SPREADSHEET_ID,
       range: `${SHEET_NAME}!A:G`,
-      valueInputOption: 'RAW',
+      valueInputOption: 'USER_ENTERED', // Изменено с RAW на USER_ENTERED для лучшей обработки UTF-8
       resource: {
         values: [rowData],
       },

@@ -1,0 +1,22 @@
+{
+  "id": "order_1759341545670",
+  "timestamp": "2025-01-01T20:30:00.000Z",
+  "userId": "mobile_test_user",
+  "phoneNumber": "+79123456789",
+  "address": "???????? ?????",
+  "items": [
+    {
+      "id": "test",
+      "flower": {
+        "id": "rose",
+        "name": "????",
+        "price": 150,
+        "emoji": "",
+        "description": "???????? ????"
+      },
+      "quantity": 1
+    }
+  ],
+  "total": 150,
+  "status": "pending"
+}

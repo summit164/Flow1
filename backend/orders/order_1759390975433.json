@@ -1,0 +1,23 @@
+{
+  "id": "order_1759390975433",
+  "timestamp": "2025-01-02T00:30:00.000Z",
+  "userId": "frontend_test_user",
+  "phoneNumber": "89234663525",
+  "address": "Кукуся пупуся",
+  "telegramId": "987654321",
+  "items": [
+    {
+      "id": "rose_1",
+      "flower": {
+        "id": "rose",
+        "name": "Роза",
+        "price": 300,
+        "emoji": "",
+        "description": "Красивая роза"
+      },
+      "quantity": 2
+    }
+  ],
+  "total": 600,
+  "status": "pending"
+}

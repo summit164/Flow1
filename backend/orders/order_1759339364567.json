@@ -1,0 +1,17 @@
+{
+  "id": "order_1759339364567",
+  "timestamp": "2025-10-01T17:22:44.567Z",
+  "phone": "+7 999 111 22 33",
+  "total": 2000,
+  "address": "???????? ????? ??? ????????? Telegram ID",
+  "userId": "704179386",
+  "status": "pending",
+  "items": [
+    {
+      "price": 2000,
+      "quantity": 1,
+      "name": "????? ???",
+      "id": 1
+    }
+  ]
+}

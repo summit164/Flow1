@@ -5,6 +5,7 @@ const axios = require('axios');
 // Получаем токен бота и URL веб-приложения из переменных окружения
 const token = process.env.BOT_TOKEN;
 const webAppUrl = process.env.WEBAPP_URL;
+const apiUrl = process.env.API_URL || 'http://localhost:3001';
 
 // Создаем экземпляр бота
 const bot = new TelegramBot(token, { polling: true });
@@ -377,7 +378,7 @@ bot.onText(/^(clear|очистить|клир)$/i, async (msg) => {
 async function getUserOrders(userId) {
   try {
     console.log(`🔍 Запрос заказов для пользователя: ${userId}`);
-    const response = await axios.get(`${webAppUrl}/api/orders?userId=${userId}`);
+    const response = await axios.get(`${apiUrl}/api/orders?userId=${userId}`);
     const orders = response.data.orders || [];
     console.log(`📦 Найдено заказов для ${userId}: ${orders.length}`);
     return orders;
@@ -393,7 +394,8 @@ async function getUserOrders(userId) {
 
 // Функция для форматирования заказа
 function formatOrder(order) {
-  let message = `📦 Заказ #${order.orderId.slice(-6)}\n`;
+  const orderIdDisplay = order.orderId ? order.orderId.slice(-6) : 'N/A';
+  let message = `📦 Заказ #${orderIdDisplay}\n`;
   message += `📅 Дата: ${new Date(order.timestamp).toLocaleString('ru-RU')}\n`;
   message += `💰 Сумма: ${order.total} ₽\n`;
   message += `📋 Статус: ${order.status === 'pending' ? 'Ожидает подтверждения' : order.status}\n\n`;

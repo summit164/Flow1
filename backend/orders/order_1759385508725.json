@@ -1,0 +1,22 @@
+{
+  "id": "order_1759385508725",
+  "timestamp": "2025-01-01T22:00:00.000Z",
+  "userId": "verification_test",
+  "phoneNumber": "+79222222222",
+  "address": "Санкт-Петербург, Невский пр., д. 1",
+  "items": [
+    {
+      "id": "test_tulip",
+      "flower": {
+        "id": "tulip",
+        "name": "Желтый тюльпан",
+        "price": 150,
+        "emoji": "",
+        "description": "Красивый желтый тюльпан"
+      },
+      "quantity": 5
+    }
+  ],
+  "total": 750,
+  "status": "pending"
+}
