@@ -2,26 +2,36 @@
 import fs from 'fs';
 import path from 'path';
 
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
 // Resolve base URL for calling local API routes in any environment
 function resolveBaseUrl(req: NextRequest): string {
-  const explicit = process.env.NEXT_PUBLIC_API_URL || process.env.API_URL;
-  if (explicit) return explicit.replace(/\/$/, '');
+  // Prefer Vercel provided URL in production
   if (process.env.VERCEL_URL) {
     return `https://${process.env.VERCEL_URL}`;
   }
+
+  // Use explicit only if it is not localhost and looks valid
+  const explicit = process.env.NEXT_PUBLIC_API_URL || process.env.API_URL;
+  if (explicit && !/localhost|127\.0\.0\.1|::1/i.test(explicit)) {
+    return explicit.replace(/\/$/, '');
+  }
+
+  // Fallback to same-origin headers
   const proto = req.headers.get('x-forwarded-proto') || 'http';
-  const host = req.headers.get('host') || 'localhost:3000';
+  const host = req.headers.get('x-forwarded-host') || req.headers.get('host') || 'localhost:3000';
   return `${proto}://${host}`;
 }
 
 // Function to log data to Google Sheets
-async function logToGoogleSheets(req: NextRequest, orderData: OrderData) {
+async function logToGoogleSheets(req: NextRequest, orderData: OrderData): Promise<{ ok: boolean; status?: number; error?: string }>{
   try {
     const base = resolveBaseUrl(req);
     const url = `${base}/api/sheets`;
     console.log('Calling Google Sheets API at:', url);
     console.log('Payload:', JSON.stringify({ orderData }, null, 2));
-    
+
     const response = await fetch(url, {
       method: 'POST',
       headers: {
@@ -29,17 +39,19 @@ async function logToGoogleSheets(req: NextRequest, orderData: OrderData) {
       },
       body: JSON.stringify({ orderData }),
     });
-    
+
     console.log('Google Sheets API response status:', response.status);
-    const result = await response.json();
+    let result: any = null;
+    try { result = await response.json(); } catch {}
     console.log('Google Sheets logging result:', result);
-    
+
     if (!response.ok) {
-      throw new Error(`Google Sheets API error: ${response.status} - ${JSON.stringify(result)}`);
+      return { ok: false, status: response.status, error: typeof result === 'string' ? result : JSON.stringify(result) };
     }
-  } catch (error) {
+    return { ok: true, status: response.status };
+  } catch (error: any) {
     console.error('Failed to log to Google Sheets:', error);
-    throw error;
+    return { ok: false, error: error?.message || 'unknown' };
   }
 }
 
@@ -110,23 +122,26 @@ export async function POST(request: NextRequest) {
       console.error('Filesystem write skipped due to error/environment:', fsErr);
     }
 
-    // Log to Google Sheets (do not fail request on errors)
-    try {
-      const sheetsData = {
-        ...orderData,
-        timestamp: new Date().toISOString(),
-      };
-      console.log('Sending data to Google Sheets:', JSON.stringify(sheetsData, null, 2));
-      await logToGoogleSheets(request, sheetsData);
+    // Log to Google Sheets (do not fail request on errors), and expose diagnostics
+    const sheetsData = {
+      ...orderData,
+      timestamp: new Date().toISOString(),
+    };
+    console.log('Sending data to Google Sheets:', JSON.stringify(sheetsData, null, 2));
+    const sheetsResult = await logToGoogleSheets(request, sheetsData);
+    if (sheetsResult.ok) {
       console.log('Successfully logged to Google Sheets');
-    } catch (error) {
-      console.error('Failed to log to Google Sheets:', error);
+    } else {
+      console.error('Google Sheets logging failed:', sheetsResult);
     }
     
     return NextResponse.json({ 
       success: true, 
       orderId,
-      message: 'Order saved successfully' 
+      message: 'Order saved successfully',
+      sheetsLogged: sheetsResult.ok,
+      sheetsStatus: sheetsResult.status ?? null,
+      sheetsError: sheetsResult.error ?? null,
     });
     
   } catch (error) {
@@ -167,5 +182,3 @@ export async function GET(request: NextRequest) {
     );
   }
 }
-
-

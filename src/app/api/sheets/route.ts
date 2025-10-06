@@ -77,7 +77,8 @@ export async function POST(request: NextRequest) {
       const name = item.flower?.name || item.name || 'Товар';
       const price = item.flower?.price ?? item.price ?? 0;
       const quantity = item.quantity ?? 1;
-      return `${name} x${quantity} (${price}₽)`;
+      // Use ASCII-friendly currency label to avoid encoding issues in Sheets
+      return `${name} x${quantity} (${price} руб.)`;
     }).join('; ');
 
     const rowData = [
@@ -85,7 +86,7 @@ export async function POST(request: NextRequest) {
       String(orderData.userId || ''),
       String(orderData.phoneNumber || ''),
       String(items || ''),
-      `${orderData.total || 0}₽`,
+      `${orderData.total || 0} руб.`,
       String(orderData.address || ''),
       String(orderData.status || 'новый')
     ];
@@ -95,7 +96,8 @@ export async function POST(request: NextRequest) {
     await sheets.spreadsheets.values.append({
       spreadsheetId: SPREADSHEET_ID as string,
       range: `${SHEET_NAME}!A:G`,
-      valueInputOption: 'USER_ENTERED',
+      // Write RAW values to prevent Sheets from interpreting content/formulas
+      valueInputOption: 'RAW',
       requestBody: { values: [rowData] },
     } as any);
 

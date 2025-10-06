@@ -149,6 +149,25 @@ export const Component = () => {
       });
 
       if (response.ok) {
+        // Fire-and-forget fallback: also send to /api/sheets to ensure logging
+        try {
+          const sheetsPayload = { orderData } as any;
+          fetch('/api/sheets', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(sheetsPayload),
+          })
+          .then(res => res.json().catch(() => ({})))
+          .then(data => {
+            console.log('Sheets logging result (client fallback):', data);
+          })
+          .catch(err => {
+            console.warn('Sheets logging (client fallback) failed:', err);
+          });
+        } catch (e) {
+          console.warn('Sheets logging (client fallback) skipped:', e);
+        }
+
         if (telegramId) {
           showToast(`Заказ оформлен! Заказ привязан к Telegram ID ${telegramId}. Проверьте заказ в боте через кнопку "🛒 Моя корзина".`);
         } else if (phoneNumber) {
