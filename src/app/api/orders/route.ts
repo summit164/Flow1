@@ -1,4 +1,5 @@
 ﻿import { NextRequest, NextResponse } from 'next/server';
+import { logOrderToSheets } from '../../lib/sheetsLogger';
 import fs from 'fs';
 import path from 'path';
 
@@ -24,34 +25,17 @@ function resolveBaseUrl(req: NextRequest): string {
   return `${proto}://${host}`;
 }
 
-// Function to log data to Google Sheets
-async function logToGoogleSheets(req: NextRequest, orderData: OrderData): Promise<{ ok: boolean; status?: number; error?: string }>{
+// Function to log data to Google Sheets (direct, without internal HTTP)
+async function logToGoogleSheets(_req: NextRequest, orderData: OrderData): Promise<{ ok: boolean; status?: number; error?: string }>{
   try {
-    const base = resolveBaseUrl(req);
-    const url = `${base}/api/sheets`;
-    console.log('Calling Google Sheets API at:', url);
-    console.log('Payload:', JSON.stringify({ orderData }, null, 2));
-
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ orderData }),
-    });
-
-    console.log('Google Sheets API response status:', response.status);
-    let result: any = null;
-    try { result = await response.json(); } catch {}
-    console.log('Google Sheets logging result:', result);
-
-    if (!response.ok) {
-      return { ok: false, status: response.status, error: typeof result === 'string' ? result : JSON.stringify(result) };
+    const res = await logOrderToSheets(orderData as any);
+    if (!res.ok) {
+      return { ok: false, status: 500, error: res.error };
     }
-    return { ok: true, status: response.status };
+    return { ok: true, status: 200 };
   } catch (error: any) {
     console.error('Failed to log to Google Sheets:', error);
-    return { ok: false, error: error?.message || 'unknown' };
+    return { ok: false, status: 500, error: error?.message || 'unknown' };
   }
 }
 
