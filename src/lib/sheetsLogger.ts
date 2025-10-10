@@ -33,6 +33,30 @@ export interface OrderLogData {
   total: number;
   timestamp: string;
   status: string;
+  orderId?: string;
+}
+
+// Compute deterministic key for idempotent upsert (one order → one row)
+function computeOrderKey(orderData: OrderLogData): string {
+  const itemsText = (orderData.items || []).map((item: any) => {
+    const name = item?.flower?.name || item?.name || 'Товар';
+    const price = item?.flower?.price ?? item?.price ?? 0;
+    const quantity = item?.quantity ?? 1;
+    return `${name} x${quantity} (${price})`;
+  }).join(';');
+  const base = [
+    orderData.orderId || '',
+    orderData.userId || '',
+    String(orderData.total ?? 0),
+    itemsText
+  ].join('|');
+  // Simple stable hash
+  let hash = 0;
+  for (let i = 0; i < base.length; i++) {
+    hash = ((hash << 5) - hash) + base.charCodeAt(i);
+    hash |= 0; // Convert to 32bit int
+  }
+  return `key_${Math.abs(hash)}`;
 }
 
 export async function logOrderToSheets(orderData: OrderLogData): Promise<{ ok: boolean; error?: string }>{
@@ -74,6 +98,8 @@ export async function logOrderToSheets(orderData: OrderLogData): Promise<{ ok: b
     return `${name} x${quantity} (${price} руб.)`;
   }).join('; ');
 
+  const orderKey = computeOrderKey(orderData);
+
   const rowData = [
     timestamp,
     String(orderData.userId || ''),
@@ -81,16 +107,62 @@ export async function logOrderToSheets(orderData: OrderLogData): Promise<{ ok: b
     String(items || ''),
     `${orderData.total || 0} руб.`,
     String(orderData.address || ''),
-    String(orderData.status || 'новый')
+    String(orderData.status || 'новый'),
+    orderKey
   ];
 
   try {
-    await sheets.spreadsheets.values.append({
+    // Try to find existing row by orderKey in column H and ensure recent time window
+    const existing = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
-      range: `${SHEET_NAME}!A:G`,
-      valueInputOption: 'RAW',
-      requestBody: { values: [rowData] },
+      range: `${SHEET_NAME}!A:H`,
     } as any);
+
+    const rows = (existing.data.values || []) as string[][];
+    let targetRowIndex: number | null = null; // 1-based index in sheet
+    const now = Date.now();
+    const windowMs = 10 * 60 * 1000; // 10 minutes
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i] || [];
+      const cellKey = row[7] ?? '';
+      if (cellKey === orderKey) {
+        // Parse timestamp from column A (ru-RU locale string); if parsing fails, treat as match only if key equals
+        const tsCell = row[0] ?? '';
+        let tsMs = Number.NaN;
+        try {
+          // Try to parse as locale string via Date constructor
+          tsMs = new Date(tsCell).getTime();
+        } catch {}
+        if (!Number.isNaN(tsMs)) {
+          if ((now - tsMs) <= windowMs) {
+            targetRowIndex = i + 1; // offset for 1-based
+            break;
+          }
+        } else {
+          // If cannot parse timestamp, still treat as match (conservative) to prevent duplication
+          targetRowIndex = i + 1;
+          break;
+        }
+      }
+    }
+
+    if (targetRowIndex) {
+      // Update existing row (A:H) to avoid duplicates
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${SHEET_NAME}!A${targetRowIndex}:H${targetRowIndex}`,
+        valueInputOption: 'RAW',
+        requestBody: { values: [rowData] },
+      } as any);
+    } else {
+      // Append new row (A:H)
+      await sheets.spreadsheets.values.append({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${SHEET_NAME}!A:H`,
+        valueInputOption: 'RAW',
+        requestBody: { values: [rowData] },
+      } as any);
+    }
     return { ok: true };
   } catch (error: any) {
     const details = error?.response?.data?.error?.message || error?.message || 'Unknown error';
