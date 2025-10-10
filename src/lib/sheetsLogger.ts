@@ -23,6 +23,7 @@ const auth = new google.auth.GoogleAuth({
 });
 
 const sheets = google.sheets({ version: 'v4', auth });
+let SHEET_ID: number | undefined;
 
 export interface OrderLogData {
   userId: string;
@@ -44,9 +45,12 @@ function computeOrderKey(orderData: OrderLogData): string {
     const quantity = item?.quantity ?? 1;
     return `${name} x${quantity} (${price})`;
   }).join(';');
+  const phoneDigits = String(orderData.phoneNumber || '').replace(/\D/g, '');
+  const normalizedAddress = String(orderData.address || '').trim().toLowerCase();
   const base = [
-    orderData.orderId || '',
     orderData.userId || '',
+    phoneDigits,
+    normalizedAddress,
     String(orderData.total ?? 0),
     itemsText
   ].join('|');
@@ -71,10 +75,10 @@ export async function logOrderToSheets(orderData: OrderLogData): Promise<{ ok: b
 
   try {
     const spreadsheetInfo = await sheets.spreadsheets.get({ spreadsheetId: SPREADSHEET_ID } as any);
-    const availableSheets = spreadsheetInfo.data.sheets?.map((sheet: any) => sheet.properties?.title || '') || [];
-    if (!availableSheets.includes(SHEET_NAME) && availableSheets.length > 0) {
-      SHEET_NAME = availableSheets[0];
-    }
+    const props = (spreadsheetInfo.data.sheets || []).map((s: any) => s.properties || {});
+    const byTitle = props.find((p: any) => p.title === SHEET_NAME) || props[0] || {};
+    SHEET_NAME = byTitle.title || SHEET_NAME;
+    SHEET_ID = byTitle.sheetId;
   } catch (error: any) {
     const details = (error?.response?.data?.error?.message) || error?.message || 'Unknown error';
     return { ok: false, error: `Failed to access Google Sheets: ${details}` };
@@ -163,6 +167,40 @@ export async function logOrderToSheets(orderData: OrderLogData): Promise<{ ok: b
         requestBody: { values: [rowData] },
       } as any);
     }
+
+    // After write, enforce uniqueness by key: if multiple rows have same key, delete extras
+    try {
+      const check = await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${SHEET_NAME}!H:H`,
+      } as any);
+      const vals = (check.data.values || []) as string[][];
+      const idxs: number[] = [];
+      for (let i = 0; i < vals.length; i++) {
+        if ((vals[i]?.[0] || '') === orderKey) idxs.push(i + 1); // 1-based
+      }
+      if (idxs.length > 1 && typeof SHEET_ID === 'number') {
+        // keep earliest row, delete others (sort desc to avoid index shift)
+        const keep = Math.min(...idxs);
+        const toDelete = idxs.filter((x) => x !== keep).sort((a, b) => b - a);
+        const requests = toDelete.map((rowIndex) => ({
+          deleteDimension: {
+            range: {
+              sheetId: SHEET_ID as number,
+              dimension: 'ROWS',
+              startIndex: rowIndex - 1,
+              endIndex: rowIndex,
+            }
+          }
+        }));
+        if (requests.length > 0) {
+          await sheets.spreadsheets.batchUpdate({
+            spreadsheetId: SPREADSHEET_ID,
+            requestBody: { requests },
+          } as any);
+        }
+      }
+    } catch {}
     return { ok: true };
   } catch (error: any) {
     const details = error?.response?.data?.error?.message || error?.message || 'Unknown error';
