@@ -1,0 +1,22 @@
+{
+    "status":  "new",
+    "timestamp":  "2025-10-06T15:06:38.1547267+03:00",
+    "userId":  "test-user-123",
+    "items":  [
+                  {
+                      "quantity":  1,
+                      "flower":  {
+                                     "price":  150,
+                                     "description":  "Test",
+                                     "name":  "Rose",
+                                     "id":  "flw-1",
+                                     "emoji":  ""
+                                 },
+                      "id":  "item-1"
+                  }
+              ],
+    "phoneNumber":  "+70000000000",
+    "telegramId":  "123456",
+    "total":  150,
+    "address":  "Тестовый адрес"
+}

@@ -1,5 +1,6 @@
 ﻿import { NextRequest, NextResponse } from 'next/server';
 import { logOrderToSheets } from '../../../lib/sheetsLogger';
+import { google } from 'googleapis';
 import fs from 'fs';
 import path from 'path';
 
@@ -142,20 +143,103 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId');
     
+    // 1) Попытка прочитать из Google Sheets
+    const spreadsheetId = process.env.GOOGLE_SPREADSHEET_ID as string;
+    const rawKey = process.env.GOOGLE_PRIVATE_KEY_B64
+      ? Buffer.from(process.env.GOOGLE_PRIVATE_KEY_B64, 'base64').toString('utf8')
+      : (process.env.GOOGLE_PRIVATE_KEY || '');
+    const normalizedPrivateKey = String(rawKey)
+      .replace(/\\n/g, '\n')
+      .replace(/\r/g, '')
+      .replace(/^['"]|['"]$/g, '')
+      .trim();
+    const clientEmail = process.env.GOOGLE_CLIENT_EMAIL;
+
+    if (spreadsheetId && clientEmail && normalizedPrivateKey) {
+      try {
+        const auth = new google.auth.GoogleAuth({
+          credentials: { client_email: clientEmail, private_key: normalizedPrivateKey },
+          scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
+        });
+        const sheets = google.sheets({ version: 'v4', auth });
+
+        let sheetName = 'Orders';
+        try {
+          const info = await sheets.spreadsheets.get({ spreadsheetId } as any);
+          const titles = info.data.sheets?.map((s: any) => s.properties?.title || '') || [];
+          if (!titles.includes(sheetName) && titles.length > 0) sheetName = titles[0];
+        } catch {}
+
+        const res = await sheets.spreadsheets.values.get({ spreadsheetId, range: `${sheetName}!A:G` } as any);
+        const rows = (res.data.values || []) as string[][];
+
+        const ordersFromSheets = rows
+          .filter((r) => r.length >= 2)
+          .map((r) => {
+            const [ts, uId, phone, itemsText, totalCell, address, status] = r;
+            let items: any[] = [];
+            if (itemsText) {
+              try {
+                items = itemsText.split(';').map((chunk) => {
+                  const part = chunk.trim();
+                  const nameMatch = part.match(/^(.*?)\s+x(\d+)/);
+                  const priceMatch = part.match(/\((\d+[\d\s]*)\s*руб\.?\)/i);
+                  const name = nameMatch ? nameMatch[1].trim() : part;
+                  const quantity = nameMatch ? Number(nameMatch[2]) : 1;
+                  const price = priceMatch ? Number(priceMatch[1].replace(/\s/g, '')) : 0;
+                  return { flower: { name, price, emoji: '•', description: '' }, quantity };
+                });
+              } catch {
+                items = [{ flower: { name: itemsText, price: 0, emoji: '•', description: '' }, quantity: 1 }];
+              }
+            }
+            const totalMatch = String(totalCell || '').match(/(\d+[\d\s]*)/);
+            const total = totalMatch ? Number(totalMatch[1].replace(/\s/g, '')) : 0;
+            return {
+              orderId: `sheet_${Date.now()}`,
+              userId: String(uId || ''),
+              phoneNumber: phone || undefined,
+              address: address || undefined,
+              items,
+              total,
+              timestamp: ts || new Date().toISOString(),
+              status: String(status || 'новый'),
+            } as any;
+          })
+          .filter((o) => {
+            if (!userId) return true;
+            const q = String(userId);
+            return (
+              o.userId === q ||
+              o.userId === `telegram_${q}` ||
+              (q.startsWith('phone_') && o.userId.replace(/\D/g, '').includes(q.replace(/\D/g, '')))
+            );
+          });
+
+        if (ordersFromSheets.length > 0 || userId) {
+          return NextResponse.json({ orders: ordersFromSheets });
+        }
+      } catch (e) {
+        console.warn('Sheets read failed, falling back to local file:', (e as any)?.message || e);
+      }
+    }
+
+    // 2) Фолбэк: локальные файлы (dev)
     const ordersDir = process.env.NODE_ENV === 'production' ? path.join('/tmp', 'orders') : path.join(process.cwd(), 'orders');
     const masterOrdersPath = path.join(ordersDir, 'all_orders.json');
-    
     if (!fs.existsSync(masterOrdersPath)) {
       return NextResponse.json({ orders: [] });
     }
-    
     const allOrders = JSON.parse(fs.readFileSync(masterOrdersPath, 'utf8'));
-    
     if (userId) {
-      const userOrders = allOrders.filter((order: OrderData) => order.userId === userId);
+      const q = String(userId);
+      const userOrders = allOrders.filter((order: OrderData) => (
+        order.userId === q ||
+        order.userId === `telegram_${q}` ||
+        (q.startsWith('phone_') && String(order.userId || '').replace(/\D/g, '').includes(q.replace(/\D/g, '')))
+      ));
       return NextResponse.json({ orders: userOrders });
     }
-    
     return NextResponse.json({ orders: allOrders });
     
   } catch (error) {
