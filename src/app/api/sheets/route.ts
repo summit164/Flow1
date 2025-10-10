@@ -1,5 +1,6 @@
 ﻿import { NextRequest, NextResponse } from 'next/server';
 import { google } from 'googleapis';
+import { logOrderToSheets } from '../../../lib/sheetsLogger';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
@@ -17,8 +18,9 @@ const normalizedPrivateKey = rawKey
   .replace(/^['"]|['"]$/g, '')
   .trim();
 
+// Прямую работу с API в POST заменяем на общий логгер с идемпотентным upsert,
+// чтобы исключить дубли. Оставляем клиент только для диагностик в GET.
 const auth = new google.auth.GoogleAuth({
-  // For service accounts, достаточно client_email и private_key
   credentials: {
     client_email: process.env.GOOGLE_CLIENT_EMAIL,
     private_key: normalizedPrivateKey,
@@ -37,71 +39,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Order data is required' }, { status: 400 });
     }
 
-    // Validate required env variables
-    const missingEnv: string[] = [];
-    if (!process.env.GOOGLE_SPREADSHEET_ID) missingEnv.push('GOOGLE_SPREADSHEET_ID');
-    if (!process.env.GOOGLE_CLIENT_EMAIL) missingEnv.push('GOOGLE_CLIENT_EMAIL');
-    if (!normalizedPrivateKey) missingEnv.push('GOOGLE_PRIVATE_KEY or GOOGLE_PRIVATE_KEY_B64');
-    if (missingEnv.length > 0) {
-      console.error('Google Sheets not configured. Missing:', missingEnv);
-      return NextResponse.json({ error: 'Google Sheets not configured', missingEnv }, { status: 500 });
+    // Пишем через общий логгер: он выполняет upsert по ключу (колонка H)
+    const res = await logOrderToSheets(orderData);
+    if (!res.ok) {
+      return NextResponse.json({ success: false, message: 'Logging failed', error: res.error }, { status: 500 });
     }
-
-    // Discover sheets and select target sheet
-    try {
-      const spreadsheetInfo = await sheets.spreadsheets.get({ spreadsheetId: SPREADSHEET_ID } as any);
-      const availableSheets = spreadsheetInfo.data.sheets?.map((sheet: any) => sheet.properties?.title || '') || [];
-      console.log('Available sheets:', availableSheets);
-      if (!availableSheets.includes(SHEET_NAME) && availableSheets.length > 0) {
-        SHEET_NAME = availableSheets[0];
-        console.log(`Sheet "Orders" not found, using "${SHEET_NAME}" instead`);
-      }
-    } catch (error: any) {
-      const details = (error?.response?.data?.error?.message) || error?.message || 'Unknown error';
-      console.error('Error getting spreadsheet info:', details);
-      return NextResponse.json({ error: 'Failed to access Google Sheets', details }, { status: 500 });
-    }
-
-    // Format row data
-    const timestamp = new Date(orderData.timestamp).toLocaleString('ru-RU', {
-      timeZone: 'Europe/Moscow',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit'
-    });
-
-    const items = (orderData.items || []).map((item: any) => {
-      const name = item.flower?.name || item.name || 'Товар';
-      const price = item.flower?.price ?? item.price ?? 0;
-      const quantity = item.quantity ?? 1;
-      // Use ASCII-friendly currency label to avoid encoding issues in Sheets
-      return `${name} x${quantity} (${price} руб.)`;
-    }).join('; ');
-
-    const rowData = [
-      timestamp,
-      String(orderData.userId || ''),
-      String(orderData.phoneNumber || ''),
-      String(items || ''),
-      `${orderData.total || 0} руб.`,
-      String(orderData.address || ''),
-      String(orderData.status || 'новый')
-    ];
-
-    console.log('Sending row data to Google Sheets:', rowData);
-
-    await sheets.spreadsheets.values.append({
-      spreadsheetId: SPREADSHEET_ID as string,
-      range: `${SHEET_NAME}!A:G`,
-      // Write RAW values to prevent Sheets from interpreting content/formulas
-      valueInputOption: 'RAW',
-      requestBody: { values: [rowData] },
-    } as any);
-
-    console.log('Order logged to Google Sheets:', orderData.userId);
     return NextResponse.json({ success: true, message: 'Order logged successfully' });
   } catch (error: any) {
     const details = error?.response?.data?.error?.message || error?.message || 'Unknown error';

@@ -110,6 +110,7 @@ export async function POST(request: NextRequest) {
     // Log to Google Sheets (do not fail request on errors), and expose diagnostics
     const sheetsData = {
       ...orderData,
+      orderId,
       timestamp: new Date().toISOString(),
     };
     console.log('Sending data to Google Sheets:', JSON.stringify(sheetsData, null, 2));
